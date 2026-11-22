@@ -718,15 +718,24 @@ def findings(g: dict) -> dict[str, list]:
             nv = sum(1 for e in edges if e["source"] == nid and e["rel"] == "has_visual" and fields[e["target"]])
             if nv > 8:                           # data visuals only; textboxes/shapes do not count
                 out["crowded_pages"].append(nid)
+    table_models = {
+        e["target"]: e["source"] for e in edges
+        if e["rel"] == "contains" and nodes[e["source"]]["kind"] == "model"
+        and nodes[e["target"]]["kind"] == "table"
+    }
+    measure_models = {
+        e["target"]: table_models[e["source"]] for e in edges
+        if e["rel"] == "has_measure" and e["source"] in table_models
+    }
     readers = collections.defaultdict(set)
     for e in edges:
-        if e["rel"] == "reads_source" and nodes[e["source"]]["kind"] == "table":
-            readers[e["target"]].add(nodes[e["source"]].get("model"))
+        if e["rel"] == "reads_source" and e["source"] in table_models:
+            readers[e["target"]].add(table_models[e["source"]])
     out["shared_sources"] = [s for s, ms in readers.items() if len(ms) > 1]
     by_name = collections.defaultdict(dict)
-    for nid, n in nodes.items():
-        if n["kind"] == "measure":
-            by_name[norm(n["label"])][n.get("model")] = re.sub(r"\s+", " ", n.get("expression", "")).strip()
+    for nid, model_id in measure_models.items():
+        n = nodes[nid]
+        by_name[norm(n["label"])][model_id] = re.sub(r"\s+", " ", n.get("expression", "")).strip()
     out["divergent_measures"] = [k for k, d in by_name.items() if len(d) > 1 and len(set(d.values())) > 1]
     for e in edges:
         if e["rel"] == "relationship" and e.get("direction") == "both":
@@ -783,6 +792,7 @@ def report_md(g: dict, root: Path, comm: dict[str, int], fnd: dict, stats: dict)
             L.append(f"| {d['label']} | {d.get('status', '')} | {d.get('connection', '')} | `{d['id'][5:]}` |")
         L.append("")
     if models:
+        model_labels = collections.Counter(m["label"] for m in models)
         L += ["## Semantic models", "", "| Model | Tables (role) | Measures | Pages | Card |", "|---|---|---|---|---|"]
         for m in sorted(models, key=lambda x: x["id"]):
             tabs = [nodes[e["target"]] for e in edges if e["source"] == m["id"] and e["rel"] == "contains"
@@ -791,7 +801,11 @@ def report_md(g: dict, root: Path, comm: dict[str, int], fnd: dict, stats: dict)
             reps = [e["source"] for e in edges if e["target"] == m["id"] and e["rel"] == "binds_model"]
             npg = sum(1 for e in edges if e["source"] in reps and e["rel"] == "has_page")
             tl = ", ".join(f"{t['label']} ({t.get('role', '?')})" for t in sorted(tabs, key=lambda t: t["label"]))
-            L.append(f"| {m['label']} | {tl} | {nm} | {npg} | [wiki/{slug(m)}.md](wiki/{slug(m)}.md) |")
+            label = m["label"]
+            if model_labels[label] > 1:
+                path = m["id"].removeprefix("model:").replace("|", r"\|")
+                label += f" (`{path}`)"
+            L.append(f"| {label} | {tl} | {nm} | {npg} | [wiki/{slug(m)}.md](wiki/{slug(m)}.md) |")
         L.append("")
     hubs = [(nodes[n], d) for n, d in deg.most_common() if nodes[n]["kind"] in
             {"measure", "column", "table", "source_object", "parameter"}][:10]

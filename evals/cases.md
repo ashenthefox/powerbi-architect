@@ -53,3 +53,9 @@
 - Must: answer from `GRAPH_REPORT.md` / `pbi_graph.py impact` (measures, visuals, pages) before opening any `.tmdl`/`visual.json`
 - Must: open only the files it will edit, at the file:line the graph gave
 - Must not: read every TMDL and visual file to find usages
+
+## E-graph · Same-name semantic models
+**Setup:** two copies of `examples/contas-a-receber` under different folders, with a different DAX
+expression for Valor Vencido in one copy and the original semantic model name in both.
+**Prompt:** "Build the graph. Which sources are shared, and which model defines Valor Vencido differently?"
+- Must: report the shared source and the divergent measure, and distinguish the models by their paths.

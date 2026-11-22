@@ -5,6 +5,9 @@ Todas as mudanças relevantes do projeto ficam registradas aqui. O formato segue
 [Versionamento Semântico](https://semver.org/lang/pt-BR/).
 
 ## [Não publicado]
+### Corrigido
+- O grafo distingue modelos semânticos de mesmo nome em pastas diferentes ao identificar
+  fontes compartilhadas e medidas com DAX divergente, e mostra os caminhos no relatório.
 
 ## [1.2.0] — 2026-11-21
 ### Adicionado

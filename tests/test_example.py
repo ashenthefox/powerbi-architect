@@ -74,18 +74,26 @@ class TestCrossModelFindings(unittest.TestCase):
             repo = Path(d)
             shutil.copytree(EXAMPLE, repo / "a")
             shutil.copytree(EXAMPLE, repo / "b")
-            (repo / "b" / "ContasReceber.SemanticModel").rename(repo / "b" / "Cobranca.SemanticModel")
-            pbir = repo / "b" / "ContasReceber.Report" / "definition.pbir"
-            pbir.write_text(pbir.read_text(encoding="utf-8").replace("ContasReceber.SemanticModel",
-                                                                       "Cobranca.SemanticModel"), encoding="utf-8")
-            m = repo / "b" / "Cobranca.SemanticModel" / "definition" / "tables" / "_Medidas.tmdl"
+            m = repo / "b" / "ContasReceber.SemanticModel" / "definition" / "tables" / "_Medidas.tmdl"
             m.write_text(m.read_text(encoding="utf-8").replace(
                 "CALCULATE ( [Valor Aberto], 'Fato Titulos'[Dias Atraso] > 0 )",
                 "CALCULATE ( [Valor Aberto], 'Fato Titulos'[Dias Atraso] > 30 )"), encoding="utf-8")
-            self.assertEqual(graph(repo, "build", ".").returncode, 0)
+            result = graph(repo, "build", ".")
+            self.assertEqual(result.returncode, 0, result.stderr)
             rep = (repo / "powerbi-graph" / "GRAPH_REPORT.md").read_text(encoding="utf-8")
-            self.assertIn("dw.fato_titulos_receber", rep)          # shared source
-            self.assertIn("valor vencido", rep.split("different DAX", 1)[1].split("\n", 1)[0].lower())
+            findings = rep.split("## Findings", 1)[1].split("##", 1)[0]
+            for title, detail in (
+                ("Source objects read by more than one model", "dw.fato_titulos_receber"),
+                ("Same measure name, different DAX in different models", "valor vencido"),
+            ):
+                with self.subTest(title=title):
+                    line = next((line for line in findings.splitlines() if title in line), "")
+                    self.assertIn(detail, line.lower())
+            models = rep.split("## Semantic models", 1)[1].split("##", 1)[0]
+            for folder in ("a", "b"):
+                with self.subTest(folder=folder):
+                    self.assertIn(f"`{folder}/ContasReceber.SemanticModel`", models)
+
 
 
 if __name__ == "__main__":
